@@ -1,0 +1,59 @@
+models:
+  - name: qwen3_30b
+    model_path: mlx-community/Qwen3-30B-A3B-4bit-DWQ
+    default: true
+    enable_auto_tool_choice: true
+    trust_remote_code: true
+    tool_call_parser: qwen3_moe
+    reasoning_parser: qwen3_moe
+
+  - name: qwen3_4b
+    model_path: mlx-community/Qwen3-4B-Instruct-2507-8bit
+    default: true
+    max_concurrency: 1
+    port: 5005
+    enable_auto_tool_choice: true
+    trust_remote_code: true
+    tool_call_parser: qwen3
+    reasoning_parser: qwen3
+
+  - name: qwen3_14b
+    model_path: mlx-community/Qwen3-14B-4bit
+    enable_auto_tool_choice: true
+    trust_remote_code: true
+    tool_call_parser: qwen3
+    reasoning_parser: qwen3
+
+  - name: qwen3_32b
+    model_path: mlx-community/Qwen3-32B-4bit-DWQ
+    enable_auto_tool_choice: true
+    trust_remote_code: true
+    tool_call_parser: qwen3
+    reasoning_parser: qwen3
+
+  - name: deepseek_qwen_14b
+    model_path: mlx-community/Unsloth-DeepSeek-R1-Distill-Qwen-14B-4bit
+    enable_auto_tool_choice: true
+    trust_remote_code: true
+
+  - name: deepseek_qwen_32b
+    model_path: mlx-community/Unsloth-DeepSeek-R1-Distill-Qwen-32B-4bit
+    enable_auto_tool_choice: true
+    trust_remote_code: true
+
+  - name: gpt_oss_20b
+    model_path: nightmedia/unsloth-gpt-oss-20b-q5-hi-mlx
+    enable_auto_tool_choice: true
+    trust_remote_code: true
+    tool_call_parser: harmony
+    reasoning_parser: harmony
+
+  - name: medgemma_27b
+    model_path: mlx-community/medgemma-27b-text-it-4bit
+    enable_auto_tool_choice: true
+    trust_remote_code: true
+
+  - name: medgemma_4b
+    model_path: mlx-community/medgemma-4b-it-4bit
+    enable_auto_tool_choice: true
+    trust_remote_code: true
