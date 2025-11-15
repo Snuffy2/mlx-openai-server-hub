@@ -17,7 +17,7 @@ If a port is defined, it will use that port (if not already in use). Otherwise i
 | default |  | false | If true, the model is started when `start` is run without names |
 | model_type |  | "lm" | |
 | context_length |  | 32768 | Maximum token context length for the model |
-| port |  | _auto-assigned` | TCP port the server will listen on; auto-assigned if omitted |
+| port |  | `auto-assigned` | TCP port the server will listen on; auto-assigned if omitted |
 | host |  | "0.0.0.0" | Host/IP to bind the server to |
 | max_concurrency |  | 1 | Max simultaneous requests the worker will accept |
 | queue_timeout |  | 300 | How long (seconds) to wait for queued requests |
