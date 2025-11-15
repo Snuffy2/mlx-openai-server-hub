@@ -16,7 +16,7 @@ from pathlib import Path
 from app.config import MLXServerConfig
 import yaml
 
-from const import LOG_ROOT, MODELS_CONFIG_FILE
+from .const import LOG_ROOT, MODELS_CONFIG_FILE
 
 
 class ModelRegistryError(RuntimeError):
@@ -25,13 +25,12 @@ class ModelRegistryError(RuntimeError):
 
 @dataclass(slots=True)
 class ModelEntry:
-    """A registry entry representing a configured model.
+    """Container for a single registry entry.
 
     Attributes:
-        name: Short nickname for the model used by the CLI.
-        config: An `MLXServerConfig` instance with model settings.
-        default: Whether this model should be started when no names are
-            provided to the `start` command.
+        name: nickname for the model
+        config: MLXServerConfig instance for the model
+        default: whether this model is a default selection
 
     """
 
@@ -41,21 +40,17 @@ class ModelEntry:
 
 
 class ModelRegistry:
-    """Loads and validates MLX models from a YAML definition file.
+    """Registry that loads and validates model definitions from YAML.
 
-    The registry reads a top-level mapping with a `models:` list. Each entry is
-    validated for required fields and against the fields available on
-    `app.config.MLXServerConfig`. Valid entries are stored as `ModelEntry`
-    instances and exposed through iteration and lookup helpers.
+    The registry exposes iteration and lookup helpers and can build
+    per-model `MLXServerConfig` instances for runtime use.
     """
 
     def __init__(self, config_file: Path | str = MODELS_CONFIG_FILE):
-        """Initialize the registry and load entries from `config_file`.
+        """Load and validate models from `config_file` into an in-memory registry.
 
-        Args:
-            config_file: Path to the YAML file describing models. Defaults to
-                the module-level `MODELS_CONFIG_FILE`.
-
+        The constructor prepares internal bookkeeping and calls `reload()`
+        to populate the registry immediately.
         """
         self.config_file = Path(config_file)
         self._entries: dict[str, ModelEntry] = {}
@@ -65,13 +60,12 @@ class ModelRegistry:
         self.reload()
 
     def reload(self) -> None:
-        """Reload and validate models from the YAML configuration file.
+        """Reload and validate the YAML models configuration file.
 
-        This replaces the registry's internal entries with the contents of the
-        YAML file. Several validation errors raise `ModelRegistryError` to
-        signal problems to the caller (typically the CLI).
+        This reads `models.yaml` (or the supplied path), validates its
+        structure and builds internal `ModelEntry` objects. Errors in
+        the file raise `ModelRegistryError` with a helpful message.
         """
-
         if not self.config_file.exists():
             raise ModelRegistryError(f"Models file not found: {self.config_file}")
 
@@ -143,37 +137,32 @@ class ModelRegistry:
         self._default_names = default_names
 
     def all_entries(self) -> Iterable[ModelEntry]:
-        """Yield all registered ModelEntry objects in the configured order."""
+        """Yield all `ModelEntry` objects in the order defined in the file."""
         for name in self._ordered_names:
             yield self._entries[name]
 
     def default_entries(self) -> Iterable[ModelEntry]:
-        """Yield ModelEntry objects that are marked as defaults."""
+        """Yield entries that are marked as default in the configuration."""
         for name in self._default_names:
             yield self._entries[name]
 
     def get_entry(self, name: str) -> ModelEntry:
-        """Return the ModelEntry for `name` or raise `ModelRegistryError`.
+        """Return the `ModelEntry` for `name` or raise `ModelRegistryError`.
 
-        Args:
-            name: The model nickname to look up.
-
-        Raises:
-            ModelRegistryError: if the name is not registered.
-
+        This performs a lookup in the registry and raises a human-readable
+        error when the requested name does not exist.
         """
         try:
             return self._entries[name]
-        except KeyError as exc:  # pragma: no cover - handled by CLI error path
+        except KeyError as exc:
             raise ModelRegistryError(f"Unknown model nickname '{name}'") from exc
 
     def build_model_map(self, names: list[str] | None) -> dict[str, MLXServerConfig]:
-        """Build a mapping of model name -> MLXServerConfig for startup.
+        """Return a mapping of model name -> MLXServerConfig for selection.
 
-        If `names` is provided, those specific models are returned. Otherwise
-        the models marked as defaults are used. Returned config objects are
-        deep-copied to ensure callers can mutate them (for example to assign
-        ports) without affecting the registry.
+        If `names` is provided, those specific entries are returned; when
+        `names` is None the registry's default entries are used. Each
+        returned config is a deep copy to allow per-process mutation.
         """
         if names:
             selected = [self.get_entry(name) for name in names]
@@ -189,11 +178,11 @@ class ModelRegistry:
         return models
 
     def default_names(self) -> list[str]:
-        """Return a list of default model names in configured order."""
+        """Return a list of names marked as default in the same order."""
         return list(self._default_names)
 
     def ordered_names(self) -> list[str]:
-        """Return a list of all model names in configured order."""
+        """Return a list of all configured model names in file order."""
         return list(self._ordered_names)
 
 

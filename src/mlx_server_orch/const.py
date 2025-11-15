@@ -10,10 +10,12 @@ from pathlib import Path
 __version__ = "0.1.0"
 
 # Root directory for the package (project root)
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Directory where per-model and process logs are written
 LOG_ROOT = BASE_DIR / "logs"
 
 # Default location of the models YAML file (can be overridden)
 MODELS_CONFIG_FILE = BASE_DIR / "models.yaml"
+
+DEFAULT_STARTING_PORT = 5005

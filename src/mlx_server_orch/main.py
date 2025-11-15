@@ -22,18 +22,18 @@ import time
 
 from loguru import logger
 
-from const import LOG_ROOT
-from model_registry import REGISTRY, ModelRegistryError
+from .const import LOG_ROOT
+from .model_registry import REGISTRY, ModelRegistryError
 
 STARTING_PORT = 5005
 PID_DIR = Path(LOG_ROOT) / "pids"
 
 
 def configure_cli_logging() -> None:
-    """Configure Loguru for command-line output.
+    """Configure logging for the CLI (stdout).
 
-    The CLI uses a simplified Loguru sink that prints only the message text
-    (no timestamps) so interactive invocations remain clean.
+    This removes any existing Loguru handlers and sets up a simple
+    stdout logger used when the CLI is executed interactively.
     """
     with contextlib.suppress(Exception):
         logger.remove()
@@ -41,11 +41,10 @@ def configure_cli_logging() -> None:
 
 
 def refresh_model_registry() -> None:
-    """Reload the in-memory model registry and exit on validation errors.
+    """Reload the global `REGISTRY` of models, exiting on error.
 
-    This helper ensures that CLI commands operate against the latest
-    `models.yaml` contents. If the registry cannot be loaded the CLI exits
-    with a non-zero status after logging the problem.
+    If the registry reload fails (invalid or missing config), log the
+    error and exit the process with a non-zero code.
     """
     try:
         REGISTRY.reload()
@@ -55,12 +54,10 @@ def refresh_model_registry() -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construct the top-level argparse.ArgumentParser for the CLI.
+    """Build and return the CLI argument parser for `mlx-server-orch`.
 
-    Returns:
-        Configured ArgumentParser with the subcommands `start`, `stop`,
-        `models`, `status`, and `help`.
-
+    The parser contains subcommands for starting, stopping and listing
+    model server processes.
     """
     parser = argparse.ArgumentParser(
         prog="mlx-server-orch",
@@ -101,7 +98,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _process_worker(name, model):
-    # Configure per-process logging BEFORE importing/initializing heavy modules
+    """Entry point target for spawned worker processes.
+
+    This configures per-process logging, registers PID cleanup and
+    invokes the application entry point (`app.main.start`) for the
+    given model configuration.
+    """
     try:
         configure_process_logging(name=name)
     except (OSError, PermissionError) as exc:  # pragma: no cover - logging best-effort
@@ -112,56 +114,37 @@ def _process_worker(name, model):
 
     _register_pid_cleanup(name)
 
-    # Worker runs in a fresh process; import modules inside the process
     from app.main import start as _start  # noqa: PLC0415
 
-    # The `model` argument is passed as a pickled MLXServerConfig instance
-    # (or another config object) from the parent process. Use it directly.
     asyncio.run(_start(model))
 
 
-"""Worker entrypoint invoked inside a spawned process.
-
-The function configures per-process logging, registers PID cleanup hooks,
-imports the MLX server startup routine and runs it with the provided
-configuration object.
-"""
-
-
 def configure_process_logging(name: str | None = None):
-    """Configure per-process stdout/stderr and Loguru logging.
+    """Configure logging for a worker process.
 
-    Call this as the very first action in a child process.
+    This redirects stdout/stderr to a per-process log file and
+    configures Loguru to receive logging records. The function also
+    registers an `atexit` handler to flush and close the file.
     """
     Path(LOG_ROOT).mkdir(parents=True, exist_ok=True)
 
     pid = os.getpid()
     suffix = name or str(pid)
 
-    # Single combined log file for this process (captures stdout, stderr, and app logs)
     app_log = Path(LOG_ROOT) / f"{suffix}-app.log"
 
-    # Open one file object (append, line-buffered)
     app_file = app_log.open("a", buffering=1, encoding="utf-8")
 
-    # Replace OS-level FDs so C extensions and subprocesses also go to the file
     os.dup2(app_file.fileno(), 1)
     os.dup2(app_file.fileno(), 2)
 
-    # Replace Python-level sys.stdout/sys.stderr to capture print() etc.
     sys.stdout = app_file
     sys.stderr = app_file
 
-    # Configure Loguru to write to the same path. Use the path (string) so
-    # rotation and other file-based options are supported by Loguru.
     with contextlib.suppress(Exception):
         logger.remove()
-    # Disable Loguru rotation to keep a single continuous file per process
-    # Disable colorization in file logs and write to the file path
     logger.add(str(app_log), backtrace=True, diagnose=True, enqueue=False, colorize=False)
 
-    # Route stdlib logging into Loguru
-    # ansi_re = re.compile(r"\x1B\[[0-9;]*[mK]")
     ansi_re = re.compile(r"\x1B?\[[0-9;]*[mK]")
 
     def _strip_ansi(s: str) -> str:
@@ -179,7 +162,6 @@ def configure_process_logging(name: str | None = None):
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
-    # Ensure files get flushed/closed at exit
     def _close_files():
         with contextlib.suppress(Exception):
             app_file.flush()
@@ -190,10 +172,10 @@ def configure_process_logging(name: str | None = None):
 
 
 def _register_pid_cleanup(name: str) -> None:
-    """Register an atexit hook to remove the PID metadata file for `name`.
+    """Register an atexit handler to remove the PID metadata file.
 
-    The PID metadata file tracks the pid/port for a running model and should
-    be removed when the worker process exits.
+    Ensures runtime directories exist and registers cleanup so that the
+    PID file is removed when the process exits normally.
     """
     ensure_runtime_dirs()
     pid_path = pid_file(name)
@@ -206,14 +188,15 @@ def _register_pid_cleanup(name: str) -> None:
 
 
 def pid_file(name: str) -> Path:
-    """Return the path to the PID metadata file for `name`."""
+    """Return the path to the PID metadata file for a given model name."""
     return PID_DIR / f"{name}.json"
 
 
 def ensure_runtime_dirs() -> None:
-    """Ensure runtime directories (logs and pid dir) exist.
+    """Create runtime directories for logs and PID metadata.
 
-    Creates `LOG_ROOT` and the PID directory if they are missing.
+    This is safe to call multiple times; it will create the directories
+    if they do not already exist.
     """
     Path(LOG_ROOT).mkdir(parents=True, exist_ok=True)
     PID_DIR.mkdir(parents=True, exist_ok=True)
@@ -222,16 +205,12 @@ def ensure_runtime_dirs() -> None:
 def assign_ports(
     models: dict[str, object], reserved_ports: set[int] | None = None
 ) -> dict[str, object]:
-    """Assign TCP ports to model configs avoiding reserved ports.
+    """Assign ports to a mapping of models, avoiding reserved ports.
 
-    Models may optionally include a `port` field. Ports already present and
-    not equal to the MLX default (8000) will be preserved if not reserved.
-    Any model without an explicit port will be assigned a free port starting
-    at `STARTING_PORT` and incrementing to avoid collisions with
-    `reserved_ports`.
-
-    Returns the same `models` mapping with `port` attributes set on config
-    objects.
+    Existing model port attributes are preserved if valid and not
+    conflicting. A new port (starting at `STARTING_PORT`) is assigned
+    when needed and the model object is mutated to include its port.
+    Returns the updated mapping.
     """
     used_ports: dict[str, int] = {}
     claimed_ports: set[int] = set(reserved_ports or set())
@@ -260,10 +239,10 @@ def assign_ports(
 
 
 def write_pid_metadata(name: str, pid: int, model) -> None:
-    """Write a small JSON file describing a running model process.
+    """Write JSON metadata for a running model process to the PID dir.
 
-    The metadata contains pid, model_path, port and a timestamp. These files
-    are used by the CLI across invocations to discover running servers.
+    The metadata contains the PID, model name, model path, assigned
+    port and start timestamp.
     """
     ensure_runtime_dirs()
     metadata = {
@@ -277,9 +256,9 @@ def write_pid_metadata(name: str, pid: int, model) -> None:
 
 
 def load_pid_metadata(name: str) -> dict | None:
-    """Load and return the PID metadata dict for `name` or None if missing.
+    """Load and return PID metadata for `name` or None if missing/corrupt.
 
-    Corrupt metadata files are removed and a warning is logged.
+    If the PID file is corrupt it is removed and None is returned.
     """
     try:
         return json.loads(pid_file(name).read_text())
@@ -293,10 +272,10 @@ def load_pid_metadata(name: str) -> dict | None:
 
 
 def discover_running_models() -> dict[str, dict]:
-    """Return a mapping of model name -> PID metadata for discovered processes.
+    """Discover running models by reading PID metadata files.
 
-    This scans the `logs/pids` directory for JSON metadata files and returns a
-    mapping suitable for status and stop actions.
+    Returns a mapping of model name -> metadata dictionary for each
+    valid PID metadata file found in the PID directory.
     """
     ensure_runtime_dirs()
     running = {}
@@ -310,10 +289,10 @@ def discover_running_models() -> dict[str, dict]:
 
 
 def process_alive(pid: int) -> bool:
-    """Return True if a process with `pid` appears to exist.
+    """Return True if a process with `pid` appears to be alive.
 
-    Uses `os.kill(pid, 0)` as a lightweight liveness probe. Permission errors
-    are treated as the process existing.
+    Uses `os.kill(pid, 0)` which raises `ProcessLookupError` if no such
+    process exists. Permission errors are treated as 'alive'.
     """
     try:
         os.kill(pid, 0)
@@ -326,15 +305,11 @@ def process_alive(pid: int) -> bool:
 
 
 def start_models(names: list[str] | None, detach: bool = True) -> None:
-    """Start the requested models and optionally detach.
+    """Start the requested models as background processes.
 
-    Args:
-        names: Optional list of model nicknames to start. If omitted, the
-            registry's default models are used.
-        detach: If True the CLI will detach and return immediately after
-            launching child processes. Otherwise the parent process
-            supervises child lifecycles.
-
+    If `names` is None the registry's default models are started. Ports
+    are assigned to avoid collisions with existing running processes.
+    When `detach` is True the launcher exits after spawning children.
     """
     refresh_model_registry()
     ensure_runtime_dirs()
@@ -395,20 +370,20 @@ def start_models(names: list[str] | None, detach: bool = True) -> None:
 
 
 def _detach_process(proc: multiprocessing.Process) -> None:
-    """Adjust multiprocessing internals to avoid auto-joining the child.
+    """Detach a child process from the multiprocessing parent tracking.
 
-    This is a best-effort operation used when detaching; on some platforms
-    it may be preferable to use OS-level daemonization instead.
+    This prevents the parent process from attempting to join the child
+    when the parent exits.
     """
     with contextlib.suppress(Exception):
         mp_util._children.discard(proc)  # noqa: SLF001 - need to avoid auto-join on exit
 
 
 def supervise_processes(processes: list[tuple[str, multiprocessing.Process]]) -> None:
-    """Block and supervise the given list of (name, Process) tuples.
+    """Supervise and gracefully shutdown foreground child processes.
 
-    Installs signal handlers to forward shutdown to children and ensures a
-    graceful termination sequence.
+    Installs SIGINT/SIGTERM handlers to forward shutdown to children and
+    waits for them to exit, terminating if necessary.
     """
     names = ", ".join(name for name, _ in processes)
     logger.info(f"Supervising model processes: {names}")
@@ -442,10 +417,10 @@ def supervise_processes(processes: list[tuple[str, multiprocessing.Process]]) ->
 
 
 def stop_models(names: list[str]) -> None:
-    """Stop the named models, or all running models if `names` is empty.
+    """Stop running model processes specified by `names`.
 
-    Sends SIGINT/SIGTERM (and SIGKILL if necessary) to child processes and
-    removes their PID metadata files.
+    If `names` is empty, all discovered running models will be targeted.
+    PID metadata is removed for stopped or stale entries.
     """
     running = discover_running_models()
     target_names = names or list(running.keys())
@@ -471,10 +446,10 @@ def stop_models(names: list[str]) -> None:
 
 
 def _terminate_process(pid: int) -> None:
-    """Attempt to gracefully terminate a process, escalating to SIGKILL.
+    """Attempt to terminate `pid` gracefully, escalating to SIGKILL.
 
-    Sends SIGINT then SIGTERM, waiting for the process to exit after each
-    signal. If the process remains, a SIGKILL is sent when available.
+    Sends SIGINT then SIGTERM with short waits, finally SIGKILL where
+    available if the process remains alive.
     """
     for sig, timeout in (
         (signal.SIGINT, 5),
@@ -497,7 +472,7 @@ def _terminate_process(pid: int) -> None:
 
 
 def _wait_for_exit(pid: int, timeout: int) -> None:
-    """Block for up to `timeout` seconds waiting for `pid` to exit."""
+    """Block until `pid` exits or `timeout` seconds elapse."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         if not process_alive(pid):
@@ -506,7 +481,10 @@ def _wait_for_exit(pid: int, timeout: int) -> None:
 
 
 def show_models() -> None:
-    """Print configured models and their paths to the CLI logger."""
+    """Log all configured models and their filesystem paths.
+
+    Default models are annotated in the output.
+    """
     refresh_model_registry()
     default_names = set(REGISTRY.default_names())
     for entry in REGISTRY.all_entries():
@@ -515,7 +493,7 @@ def show_models() -> None:
 
 
 def status_models() -> None:
-    """Show runtime status for discovered model processes."""
+    """Report status for discovered running models (running/stopped)."""
     running = discover_running_models()
     if not running:
         logger.info("No models are currently running.")
@@ -533,7 +511,11 @@ def status_models() -> None:
 
 
 def show_help(parser: argparse.ArgumentParser) -> None:
-    """Print the main help text and detailed `start` subparser help."""
+    """Print help for the main CLI and additional start options.
+
+    Prints the primary `argparse` help and, if available, prints
+    help for the `start` subparser to show its extended options.
+    """
     parser.print_help()
     start_parser = getattr(parser, "start_parser", None)
     if start_parser:
@@ -543,10 +525,10 @@ def show_help(parser: argparse.ArgumentParser) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """CLI entrypoint; parse arguments and dispatch commands.
+    """CLI entrypoint for `mlx-server-orch`.
 
-    The `argv` parameter is provided for easier testing; when None the
-    interpreter's `sys.argv` is used.
+    Parses CLI arguments and dispatches to the appropriate subcommand
+    handler (start/stop/models/status/help).
     """
     configure_cli_logging()
     parser = build_parser()

@@ -1,6 +1,9 @@
 models.yaml
 logs/
 
+copilot-instructions.md
+AGENTS.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

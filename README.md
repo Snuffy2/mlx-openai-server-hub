@@ -1,6 +1,6 @@
 # MLX OpenAI Server Orchestrator
 
-Wraps MLX OpenAI Server workers in a small CLI so you can launch and manage multiple OpenAI-compatible back-ends on the same machine. All model metadata lives in a single YAML file.
+Wraps [MLX OpenAI Server](https://github.com/cubist38/mlx-openai-server) workers in a small CLI so you can launch and manage multiple OpenAI-compatible back-ends on the same machine. All model metadata lives in a single YAML file.
 
 If a port is defined, it will use that port (if not already in use). Otherwise it will assign a port sequentially starting from `starting_port`.
 
@@ -105,7 +105,7 @@ If you prefer not to install, you can run the CLI directly from the repo using
 the virtualenv interpreter:
 
 ```bash
-./.venv/bin/python main.py models
+./.venv/bin/python -m mlx_server_orch.main models
 ```
 
 ## Build & package
