@@ -22,11 +22,8 @@ import time
 
 from loguru import logger
 
-from .const import LOG_ROOT
+from .const import DEFAULT_STARTING_PORT, LOG_ROOT, PID_DIR
 from .model_registry import REGISTRY, ModelRegistryError
-
-STARTING_PORT = 5005
-PID_DIR = Path(LOG_ROOT) / "pids"
 
 
 def configure_cli_logging() -> None:
@@ -203,17 +200,20 @@ def ensure_runtime_dirs() -> None:
 
 
 def assign_ports(
-    models: dict[str, object], reserved_ports: set[int] | None = None
+    models: dict[str, object],
+    reserved_ports: set[int] | None = None,
+    starting_port: int | None = None,
 ) -> dict[str, object]:
     """Assign ports to a mapping of models, avoiding reserved ports.
 
     Existing model port attributes are preserved if valid and not
-    conflicting. A new port (starting at `STARTING_PORT`) is assigned
-    when needed and the model object is mutated to include its port.
-    Returns the updated mapping.
+    conflicting. A new port (starting at the configured `starting_port`)
+    is assigned when needed and the model object is mutated to include
+    its port. Returns the updated mapping.
     """
     used_ports: dict[str, int] = {}
     claimed_ports: set[int] = set(reserved_ports or set())
+    base_port = starting_port if starting_port is not None else DEFAULT_STARTING_PORT
 
     for name, model in models.items():
         port = getattr(model, "port", None)
@@ -224,7 +224,7 @@ def assign_ports(
     for name, model in models.items():
         port = getattr(model, "port", None)
         if port is None or port == 8000 or used_ports.get(name) != port:
-            temp_port = STARTING_PORT
+            temp_port = base_port
             while temp_port in claimed_ports:
                 temp_port += 1
             setattr(model, "port", temp_port)
@@ -329,7 +329,12 @@ def start_models(names: list[str] | None, detach: bool = True) -> None:
         logger.error(str(exc))
         raise SystemExit(1) from exc
 
-    models = assign_ports(requested_models, reserved_ports=reserved_ports)
+    starting_port = REGISTRY.starting_port() or DEFAULT_STARTING_PORT
+    models = assign_ports(
+        requested_models,
+        reserved_ports=reserved_ports,
+        starting_port=starting_port,
+    )
     processes: list[tuple[str, multiprocessing.Process]] = []
     started = 0
 

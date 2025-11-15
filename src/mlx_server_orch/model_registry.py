@@ -57,6 +57,7 @@ class ModelRegistry:
         self._ordered_names: list[str] = []
         self._default_names: list[str] = []
         self._config_fields = {field.name: field for field in fields(MLXServerConfig)}
+        self._starting_port: int | None = None
         self.reload()
 
     def reload(self) -> None:
@@ -74,6 +75,13 @@ class ModelRegistry:
 
         if not isinstance(raw, dict):
             raise ModelRegistryError("models.yaml must contain a mapping with a 'models' list")
+
+        starting_port = raw.get("starting_port")
+        if starting_port is not None:
+            if not isinstance(starting_port, int):
+                raise ModelRegistryError("starting_port must be an integer")
+            if starting_port <= 0:
+                raise ModelRegistryError("starting_port must be a positive integer")
 
         items = raw.get("models")
         if not isinstance(items, list):
@@ -135,6 +143,7 @@ class ModelRegistry:
         self._entries = entries
         self._ordered_names = ordered_names
         self._default_names = default_names
+        self._starting_port = starting_port
 
     def all_entries(self) -> Iterable[ModelEntry]:
         """Yield all `ModelEntry` objects in the order defined in the file."""
@@ -184,6 +193,10 @@ class ModelRegistry:
     def ordered_names(self) -> list[str]:
         """Return a list of all configured model names in file order."""
         return list(self._ordered_names)
+
+    def starting_port(self) -> int | None:
+        """Return the configured starting port or None if not defined."""
+        return self._starting_port
 
 
 REGISTRY = ModelRegistry()
