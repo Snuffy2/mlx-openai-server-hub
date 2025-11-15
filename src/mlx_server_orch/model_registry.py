@@ -1,9 +1,9 @@
-"""Model registry utilities.
+"""Model registry utilities for MLX OpenAI Server Orchestrator.
 
 This module provides a tiny registry that loads model definitions from a
 YAML file (`models.yaml`) and validates them against the MLXServerConfig
-dataclass. It exposes a `REGISTRY` singleton used by the CLI to enumerate and
-instantiate per-model configurations.
+dataclass. Callers interact with the registry via `get_registry()` to
+enumerate or instantiate per-model configurations on demand.
 """
 
 from __future__ import annotations
@@ -11,12 +11,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 import copy
 from dataclasses import dataclass, fields
+from functools import lru_cache
 from pathlib import Path
 
 from app.config import MLXServerConfig
 import yaml
 
-from .const import LOG_ROOT, MODELS_CONFIG_FILE
+from . import paths
 
 
 class ModelRegistryError(RuntimeError):
@@ -46,25 +47,29 @@ class ModelRegistry:
     per-model `MLXServerConfig` instances for runtime use.
     """
 
-    def __init__(self, config_file: Path | str = MODELS_CONFIG_FILE):
+    def __init__(self, config_file: Path | str | None = None):
         """Load and validate models from `config_file` into an in-memory registry.
 
         The constructor prepares internal bookkeeping and calls `reload()`
         to populate the registry immediately.
         """
-        self.config_file = Path(config_file)
+        default_config = paths.models_config_file()
+        self.config_file = Path(config_file or default_config)
         self._entries: dict[str, ModelEntry] = {}
         self._ordered_names: list[str] = []
         self._default_names: list[str] = []
         self._config_fields = {field.name: field for field in fields(MLXServerConfig)}
         self._starting_port: int | None = None
+        self._base_path: Path = paths.base_path()
         self.reload()
 
     def reload(self) -> None:
         """Reload and validate the YAML models configuration file.
 
         This reads `models.yaml` (or the supplied path), validates its
-        structure and builds internal `ModelEntry` objects. Errors in
+        structure and builds internal `ModelEntry` objects. The file may
+        define a `base_path` that sets the root directory for runtime
+        artifacts (defaults to the current working directory). Errors in
         the file raise `ModelRegistryError` with a helpful message.
         """
         if not self.config_file.exists():
@@ -75,6 +80,10 @@ class ModelRegistry:
 
         if not isinstance(raw, dict):
             raise ModelRegistryError("models.yaml must contain a mapping with a 'models' list")
+
+        base_path_value = raw.get("base_path")
+        base_path = self._resolve_base_path(base_path_value)
+        self._base_path = paths.set_base_path(base_path)
 
         starting_port = raw.get("starting_port")
         if starting_port is not None:
@@ -128,7 +137,7 @@ class ModelRegistry:
                 setattr(config, key, value)
 
             if not config.no_log_file and not config.log_file:
-                config.log_file = str(Path(LOG_ROOT) / f"{name}.log")
+                config.log_file = str(paths.log_root() / f"{name}.log")
 
             entries[name] = ModelEntry(name=name, config=config, default=default)
             ordered_names.append(name)
@@ -144,6 +153,17 @@ class ModelRegistry:
         self._ordered_names = ordered_names
         self._default_names = default_names
         self._starting_port = starting_port
+
+    def _resolve_base_path(self, value: str | Path | None) -> Path:
+        """Resolve `base_path` from the config, defaulting to ~/mlx-server-orch."""
+
+        if value is None:
+            return paths.base_path()
+
+        candidate = Path(value).expanduser()
+        if not candidate.is_absolute():
+            candidate = (self.config_file.parent / candidate).resolve()
+        return candidate
 
     def all_entries(self) -> Iterable[ModelEntry]:
         """Yield all `ModelEntry` objects in the order defined in the file."""
@@ -198,5 +218,14 @@ class ModelRegistry:
         """Return the configured starting port or None if not defined."""
         return self._starting_port
 
+    def base_path(self) -> Path:
+        """Return the resolved base path from the models configuration."""
 
-REGISTRY = ModelRegistry()
+        return self._base_path
+
+
+@lru_cache(maxsize=1)
+def get_registry() -> ModelRegistry:
+    """Return the singleton registry, instantiating it lazily."""
+
+    return ModelRegistry()

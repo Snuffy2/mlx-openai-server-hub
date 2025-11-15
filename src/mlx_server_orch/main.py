@@ -22,8 +22,9 @@ import time
 
 from loguru import logger
 
-from .const import DEFAULT_STARTING_PORT, LOG_ROOT, PID_DIR
-from .model_registry import REGISTRY, ModelRegistryError
+from . import paths
+from .const import DEFAULT_STARTING_PORT
+from .model_registry import ModelRegistryError, get_registry
 
 
 def configure_cli_logging() -> None:
@@ -44,10 +45,22 @@ def refresh_model_registry() -> None:
     error and exit the process with a non-zero code.
     """
     try:
-        REGISTRY.reload()
+        get_registry().reload()
     except ModelRegistryError as exc:
         logger.error(str(exc))
         raise SystemExit(1) from exc
+
+
+def ensure_models_file_exists() -> None:
+    """Exit with a helpful error if the models.yaml file is missing."""
+
+    config_path = paths.models_config_file()
+    if not config_path.exists():
+        logger.error(
+            "Missing models configuration: %s. Copy models.yaml-example or create one.",
+            config_path,
+        )
+        raise SystemExit(1)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -101,6 +114,9 @@ def _process_worker(name, model):
     invokes the application entry point (`app.main.start`) for the
     given model configuration.
     """
+    # Load registry first to set the correct base_path in this child process
+    refresh_model_registry()
+
     try:
         configure_process_logging(name=name)
     except (OSError, PermissionError) as exc:  # pragma: no cover - logging best-effort
@@ -123,12 +139,13 @@ def configure_process_logging(name: str | None = None):
     configures Loguru to receive logging records. The function also
     registers an `atexit` handler to flush and close the file.
     """
-    Path(LOG_ROOT).mkdir(parents=True, exist_ok=True)
+    log_root = paths.log_root()
+    log_root.mkdir(parents=True, exist_ok=True)
 
     pid = os.getpid()
     suffix = name or str(pid)
 
-    app_log = Path(LOG_ROOT) / f"{suffix}-app.log"
+    app_log = log_root / f"{suffix}-app.log"
 
     app_file = app_log.open("a", buffering=1, encoding="utf-8")
 
@@ -186,7 +203,7 @@ def _register_pid_cleanup(name: str) -> None:
 
 def pid_file(name: str) -> Path:
     """Return the path to the PID metadata file for a given model name."""
-    return PID_DIR / f"{name}.json"
+    return paths.pid_dir() / f"{name}.json"
 
 
 def ensure_runtime_dirs() -> None:
@@ -195,8 +212,8 @@ def ensure_runtime_dirs() -> None:
     This is safe to call multiple times; it will create the directories
     if they do not already exist.
     """
-    Path(LOG_ROOT).mkdir(parents=True, exist_ok=True)
-    PID_DIR.mkdir(parents=True, exist_ok=True)
+    paths.log_root().mkdir(parents=True, exist_ok=True)
+    paths.pid_dir().mkdir(parents=True, exist_ok=True)
 
 
 def assign_ports(
@@ -279,7 +296,7 @@ def discover_running_models() -> dict[str, dict]:
     """
     ensure_runtime_dirs()
     running = {}
-    for path in PID_DIR.glob("*.json"):
+    for path in paths.pid_dir().glob("*.json"):
         name = path.stem
         meta = load_pid_metadata(name)
         if not meta:
@@ -312,6 +329,7 @@ def start_models(names: list[str] | None, detach: bool = True) -> None:
     When `detach` is True the launcher exits after spawning children.
     """
     refresh_model_registry()
+    registry = get_registry()
     ensure_runtime_dirs()
     running = discover_running_models()
     reserved_ports: set[int] = set()
@@ -324,12 +342,12 @@ def start_models(names: list[str] | None, detach: bool = True) -> None:
             continue
         reserved_ports.add(port)
     try:
-        requested_models = REGISTRY.build_model_map(names or None)
+        requested_models = registry.build_model_map(names or None)
     except ModelRegistryError as exc:
         logger.error(str(exc))
         raise SystemExit(1) from exc
 
-    starting_port = REGISTRY.starting_port() or DEFAULT_STARTING_PORT
+    starting_port = registry.starting_port() or DEFAULT_STARTING_PORT
     models = assign_ports(
         requested_models,
         reserved_ports=reserved_ports,
@@ -427,6 +445,7 @@ def stop_models(names: list[str]) -> None:
     If `names` is empty, all discovered running models will be targeted.
     PID metadata is removed for stopped or stale entries.
     """
+    refresh_model_registry()
     running = discover_running_models()
     target_names = names or list(running.keys())
     if not target_names:
@@ -491,14 +510,16 @@ def show_models() -> None:
     Default models are annotated in the output.
     """
     refresh_model_registry()
-    default_names = set(REGISTRY.default_names())
-    for entry in REGISTRY.all_entries():
+    registry = get_registry()
+    default_names = set(registry.default_names())
+    for entry in registry.all_entries():
         label = " (default)" if entry.name in default_names else ""
         logger.info(f"{entry.name}{label} -> {getattr(entry.config, 'model_path', 'unknown')}")
 
 
 def status_models() -> None:
     """Report status for discovered running models (running/stopped)."""
+    refresh_model_registry()
     running = discover_running_models()
     if not running:
         logger.info("No models are currently running.")
@@ -538,6 +559,9 @@ def main(argv: list[str] | None = None) -> None:
     configure_cli_logging()
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.command in {"start", "stop", "models", "status"}:
+        ensure_models_file_exists()
 
     if args.command == "start":
         start_models(args.names, detach=True)

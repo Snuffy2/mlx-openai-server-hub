@@ -6,6 +6,8 @@ If a port is defined, it will use that port (if not already in use). Otherwise i
 
 ## models.yaml
 
+**base_path:** _(optional, defaults to `~/mlx-server-orch`)_ — root directory that contains `models.yaml` and where `logs/` and `pids/` are written. Relative paths are resolved against the config file's location.
+
 **starting_port:** _(optional, defaults to 5005)_
 
 **models:**
@@ -27,7 +29,7 @@ If a port is defined, it will use that port (if not already in use). Otherwise i
 | config_name |  |  | |
 | lora_paths |  |  | |
 | lora_scales |  |  | |
-| log_file |  | logs/<name>.log | Path and name of per-model log file |
+| log_file |  | <base_path>/logs/<name>.log | Path and name of per-model log file |
 | no_log_file |  | false | When true, suppress writing a per-model log file |
 | log_level |  | "INFO" | Logging level for the worker process |
 | enable_auto_tool_choice |  | false | Allow the model to select tools automatically when available |
@@ -35,11 +37,12 @@ If a port is defined, it will use that port (if not already in use). Otherwise i
 | reasoning_parser |  |  | |
 | trust_remote_code |  | false | Allow execution of remote model code when loading (use with caution) |
 
-If you omit `log_file` (and `no_log_file` is `false`) the loader writes logs to `logs/<name>.log` automatically.
+If you omit `log_file` (and `no_log_file` is `false`) the loader writes logs to `<base_path>/logs/<name>.log` automatically.
 
 ### Example snippet from `models.yaml`:
 
 ```yaml
+base_path: ~/mlx-server-orch
 starting_port: 5005
 models:
   - name: qwen3_30b
@@ -78,18 +81,23 @@ mlx-server-orch status                  # inspect running servers
 mlx-server-orch stop medgemma_4b        # stop one model
 ```
 
-* Each started model writes logs to `logs/` (and per-process `logs/pids/` files for tracking).
+* Each started model writes logs to `<base_path>/logs/` (and per-process PID files in `<base_path>/pids/`).
 * Edit `models.yaml` whenever you need to add, remove, or retune a model
 
 
-## Install & run
+## Local Install for Testing and Development
+
+### Install & run
 
 Install the CLI into a virtual environment (recommended) and run the
-`mlx-server-orch` command provided by the package:
+`mlx-server-orch` command:
 
 ```bash
+git clone https://github.com/Snuffy2/mlx-server-orch.git
+cd mlx-server-orch
 python -m venv .venv
 ./.venv/bin/python -m pip install -e .
+source .venv/bin/activate
 # then run the installed CLI
 mlx-server-orch models
 ```
@@ -108,7 +116,7 @@ the virtualenv interpreter:
 ./.venv/bin/python -m mlx_server_orch.main models
 ```
 
-## Build & package
+### Build & package
 
 A minimal example to build a wheel locally and install it for testing.
 
@@ -119,11 +127,4 @@ python -m build --wheel
 
 # install the produced wheel locally
 pip install dist/*.whl
-```
-
-To publish to PyPI, use `twine`:
-
-```bash
-python -m pip install --upgrade twine
-python -m twine upload dist/*
 ```
