@@ -211,8 +211,11 @@ split-on-trailing-comma = false
 [project.scripts]
 "mlx-server-orch" = "main:main"
 
+[tool.setuptools]
+"py-modules" = ["main", "model_registry", "const"]
+
 [tool.setuptools.dynamic]
-version = { attr = "const:VERSION" }
+version = { attr = "const.__version__" }
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

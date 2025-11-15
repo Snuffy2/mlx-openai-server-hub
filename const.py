@@ -7,7 +7,7 @@ single place makes them easy to override in tests or alternate deployments.
 
 from pathlib import Path
 
-VERSION = "0.1.0"
+__version__ = "0.1.0"
 
 # Root directory for the package (project root)
 BASE_DIR = Path(__file__).resolve().parent
