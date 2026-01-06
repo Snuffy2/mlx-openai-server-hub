@@ -16,9 +16,9 @@ body:
     validations:
       required: true
   - type: input
-    id: mlx-server-orch-version
+    id: mlx-openai-server-hub-version
     attributes:
-      label: mlx-server-orch Version
+      label: mlx-openai-server-hub Version
     validations:
       required: true
   - type: textarea

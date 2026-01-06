@@ -1,4 +1,4 @@
-base_path: ~/mlx-server-orch
+base_path: ~/mlx-openai-server-hub
 starting_port: 5005
 models:
   - name: qwen3_30b

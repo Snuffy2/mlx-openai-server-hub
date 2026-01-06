@@ -1,4 +1,4 @@
-"""Model registry utilities for MLX OpenAI Server Orchestrator.
+"""Model registry utilities for MLX OpenAI Server Hub.
 
 This module provides a tiny registry that loads model definitions from a
 YAML file (`models.yaml`) and validates them against the MLXServerConfig
@@ -154,7 +154,7 @@ class ModelRegistry:
         self._starting_port = starting_port
 
     def _resolve_base_path(self, value: str | Path | None) -> Path:
-        """Resolve `base_path` from the config, defaulting to ~/mlx-server-orch."""
+        """Resolve `base_path` from the config, defaulting to ~/mlx-openai-server-hub."""
 
         if value is None:
             return paths.base_path()

@@ -1,4 +1,4 @@
-# MLX OpenAI Server Orchestrator
+# MLX OpenAI Server Hub
 
 Wraps [MLX OpenAI Server](https://github.com/cubist38/mlx-openai-server) workers in a small CLI so you can launch and manage multiple OpenAI-compatible back-ends on the same machine. All model metadata lives in a single YAML file.
 
@@ -6,7 +6,7 @@ If a port is defined, it will use that port (if not already in use). Otherwise i
 
 ## models.yaml
 
-**base_path:** _(optional, defaults to `~/mlx-server-orch`)_ — root directory where `logs/` and `pids/` are written. Relative paths are resolved against the config file's location.
+**base_path:** _(optional, defaults to `~/mlx-openai-server-hub`)_ — root directory where `logs/` and `pids/` are written. Relative paths are resolved against the config file's location.
 
 **starting_port:** _(optional, defaults to 5005)_
 
@@ -14,7 +14,7 @@ If a port is defined, it will use that port (if not already in use). Otherwise i
 
 | Field | Required | Default | Description |
 | --- | :---: | --- | --- |
-| name | ✓ |  | Name used by the Orchestrator (e.g., qwen3_30b) |
+| name | ✓ |  | Name used by the Hub (e.g., qwen3_30b) |
 | model_path | ✓ |  | Huggingface model name (e.g., owner/model-name) |
 | default |  | false | If true, the model is started when `start` is run without names |
 | model_type |  | "lm" | |
@@ -42,7 +42,7 @@ If you omit `log_file` (and `no_log_file` is `false`) the loader writes logs to 
 ### Example snippet from `models.yaml`:
 
 ```yaml
-base_path: ~/mlx-server-orch
+base_path: ~/mlx-openai-server-hub
 starting_port: 5005
 models:
   - name: qwen3_30b
@@ -66,11 +66,11 @@ The `models.yaml` file is searched for in the following order:
 1. Path specified via `--config` CLI argument
 2. Path specified in `MLXSERVER_MODELS_PATH` environment variable
 3. `models.yaml` in the current working directory
-4. `models.yaml` in the default base path (`~/mlx-server-orch`)
+4. `models.yaml` in the default base path (`~/mlx-openai-server-hub`)
 
 ## CLI commands
 
-All commands run through `mlx-server-orch <command>`. The `start` command launches child processes and runs detached. All commands support the global `--config` option to specify the path to `models.yaml`, or set the `MLXSERVER_MODELS_PATH` environment variable.
+All commands run through `mlx-openai-server-hub <command>`. The `start` command launches child processes and runs detached. All commands support the global `--config` option to specify the path to `models.yaml`, or set the `MLXSERVER_MODELS_PATH` environment variable.
 
 | Command | Description |
 | --- | --- |
@@ -83,19 +83,19 @@ All commands run through `mlx-server-orch <command>`. The `start` command launch
 ### Typical workflow
 
 ```bash
-mlx-server-orch models
-mlx-server-orch start                   # starts every default model
-mlx-server-orch start medgemma_4b       # start one additional model
-mlx-server-orch status                  # inspect running servers
-mlx-server-orch stop medgemma_4b        # stop one model
+mlx-openai-server-hub models
+mlx-openai-server-hub start                   # starts every default model
+mlx-openai-server-hub start medgemma_4b       # start one additional model
+mlx-openai-server-hub status                  # inspect running servers
+mlx-openai-server-hub stop medgemma_4b        # stop one model
 ```
 
 You can specify a custom config file:
 
 ```bash
-mlx-server-orch --config /path/to/models.yaml start
+mlx-openai-server-hub --config /path/to/models.yaml start
 # or
-MLXSERVER_MODELS_PATH=/path/to/models.yaml mlx-server-orch start
+MLXSERVER_MODELS_PATH=/path/to/models.yaml mlx-openai-server-hub start
 ```
 
 * Each started model writes logs to `<base_path>/logs/` (and per-process PID files in `<base_path>/pids/`).
@@ -107,23 +107,23 @@ MLXSERVER_MODELS_PATH=/path/to/models.yaml mlx-server-orch start
 ### Install & run
 
 Install the CLI into a virtual environment (recommended) and run the
-`mlx-server-orch` command:
+`mlx-openai-server-hub` command:
 
 ```bash
-git clone https://github.com/Snuffy2/mlx-server-orch.git
-cd mlx-server-orch
+git clone https://github.com/Snuffy2/mlx-openai-server-hub.git
+cd mlx-openai-server-hub
 python -m venv .venv
 ./.venv/bin/python -m pip install -e .
 source .venv/bin/activate
 # then run the installed CLI
-mlx-server-orch models
+mlx-openai-server-hub models
 ```
 
 Or install system-wide (or in your active environment):
 
 ```bash
 pip install .
-mlx-server-orch start
+mlx-openai-server-hub start
 ```
 
 If you prefer not to install, you can run the CLI directly from the repo using

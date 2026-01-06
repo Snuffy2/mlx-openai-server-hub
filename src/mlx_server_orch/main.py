@@ -1,4 +1,4 @@
-"""MLX OpenAI Server Orchestrator CLI.
+"""MLX OpenAI Server Hub CLI.
 
 Command-line interface to start, stop, list, and inspect multiple MLX OpenAI
 server worker instances on the same host. It manages per-process logging,
@@ -63,14 +63,14 @@ def ensure_models_file_exists(config_file: Path | str | None) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build and return the CLI argument parser for `mlx-server-orch`.
+    """Build and return the CLI argument parser for `mlx-openai-server-hub`.
 
     The parser contains subcommands for starting, stopping and listing
     model server processes.
     """
     parser = argparse.ArgumentParser(
-        prog="mlx-server-orch",
-        description="MLX OpenAI Server Orchestrator — manage MLX model server processes",
+        prog="mlx-openai-server-hub",
+        description="MLX OpenAI Server Hub — manage MLX model server processes",
     )
     parser.add_argument(
         "--config",
@@ -569,7 +569,7 @@ def show_help(parser: argparse.ArgumentParser) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """CLI entrypoint for `mlx-server-orch`.
+    """CLI entrypoint for `mlx-openai-server-hub`.
 
     Parses CLI arguments and dispatches to the appropriate subcommand
     handler (start/stop/models/status/help).

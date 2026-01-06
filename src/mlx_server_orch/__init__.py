@@ -1,4 +1,4 @@
-"""MLX OpenAI Server Orchestrator package.
+"""MLX OpenAI Server Hub package.
 
 This package contains the CLI and supporting modules used to launch and
 manage MLX OpenAI Server workers. The package itself has no runtime
