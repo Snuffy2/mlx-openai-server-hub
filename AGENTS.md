@@ -1,6 +1,6 @@
 # Coding Guidelines for AI Agents
 
-This document outlines the coding standards and best practices that AI agents must follow when contributing to the `mlx-server-orch` project. These guidelines ensure consistency, maintainability, and high-quality code.
+This document outlines the coding standards and best practices that AI agents must follow when contributing to the `mlx-openai-server-hub` project. These guidelines ensure consistency, maintainability, and high-quality code.
 
 ## Development Environment
 

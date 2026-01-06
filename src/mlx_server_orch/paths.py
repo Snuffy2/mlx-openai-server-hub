@@ -1,4 +1,4 @@
-"""Runtime path helpers for MLX OpenAI Server Orchestrator."""
+"""Runtime path helpers for MLX OpenAI Server Hub."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ _PATHS = _RuntimePaths(DEFAULT_BASE_PATH)
 
 
 def base_path() -> Path:
-    """Return the currently active base path (defaults to ~/mlx-server-orch)."""
+    """Return the currently active base path (defaults to ~/mlx-openai-server-hub)."""
 
     return _PATHS.base_path
 

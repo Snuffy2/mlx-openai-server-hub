@@ -1,6 +1,6 @@
 [project]
-name = "mlx-server-orch"
-description = "MLX OpenAI Server Orchestrator — a small CLI to launch and manage MLX OpenAI Server workers."
+name = "mlx-openai-server-hub"
+description = "MLX OpenAI Server Hub — a small CLI to launch and manage MLX OpenAI Server workers."
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Snuffy2" }]
@@ -23,8 +23,8 @@ dependencies = [
 dev = ["pytest", "ruff"]
 
 [project.urls]
-Repository = "https://github.com/Snuffy2/mlx-server-orch"
-Homepage = "https://github.com/Snuffy2/mlx-server-orch"
+Repository = "https://github.com/Snuffy2/mlx-openai-server-hub"
+Homepage = "https://github.com/Snuffy2/mlx-openai-server-hub"
 
 [tool.codespell]
 skip = "*.py,*.toml,*.ipynb"
@@ -201,7 +201,7 @@ combine-as-imports = true
 split-on-trailing-comma = false
 
 [project.scripts]
-"mlx-server-orch" = "mlx_server_orch.main:main"
+"mlx-openai-server-hub" = "mlx_server_orch.main:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
