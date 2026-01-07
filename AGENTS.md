@@ -1,51 +1,389 @@
-# Coding Guidelines for AI Agents
+# AI Agent Development Guidelines
 
-This document outlines the coding standards and best practices that AI agents must follow when contributing to the `mlx-openai-server-hub` project. These guidelines ensure consistency, maintainability, and high-quality code.
+This document provides comprehensive guidelines for AI coding agents contributing to the `mlx-openai-server-hub` project. Following these standards ensures consistency, maintainability, and quality across the codebase.
 
-## Development Environment
+---
 
-- **Virtual Environment**: All Python commands must be executed within a virtual environment. Create a `.venv` directory if it does not exist, and install dependencies and development dependencies from `pyproject.toml` as needed.
-- **Dependency Management**: Never install packages globally using `pip`. Update `pyproject.toml` when adding new dependencies, and document the rationale in commit messages or pull request descriptions.
-- **Pre-commit Hooks**: Utilize pre-commit with Ruff for code formatting and linting.
-- **Type Checking**: Employ MyPy for static type checking.
+## Table of Contents
 
-## Code Quality
+1. [Environment Setup](#environment-setup)
 
-- **Docstrings**: Provide docstrings for all files, classes, and methods. Use NumPy-style docstrings for methods.
-- **Type Annotations**: Include type annotations on all function signatures, method signatures, and class attributes. Always specify return types, including `None` where applicable.
-- **Future Annotations**: Import `from __future__ import annotations` to enable deferred evaluation of type annotations, facilitating forward references without string literals.
-- **Generic Types**: For Python 3.11+, use built-in generic types (e.g., `dict[str, Any]`, `list[str]`) instead of their `typing` module counterparts (e.g., `Dict[str, Any]`, `List[str]`).
-- **Import Statements**: Place all import statements at the top of the file.
-- **Exception Handling**: Avoid broad `except Exception` clauses; opt for specific exceptions. Use tuple syntax for catching multiple exceptions. If an exception cannot be handled meaningfully, re-raise it or raise a more descriptive custom exception.
-- **Comments**: Preserve existing comments and maintain clear, up-to-date comments for complex algorithms, configuration settings, and architectural decisions.
+2. [Code Quality & Style](#code-quality--style)
 
-## Testing and Validation
+3. [Python Best Practices](#python-best-practices)
 
-- **Testing Framework**: Pytest is not currently in use, and tests do not need to be created at this time.
-- **Input Validation**: Validate all user inputs, particularly file paths and model parameters.
-- **Security**: Do not hardcode API keys, tokens, or credentials. Use environment variables or secure configuration files instead.
+4. [Error Handling & Logging](#error-handling--logging)
 
-## Asynchronous Programming
+5. [Version Control & Collaboration](#version-control--collaboration)
 
-- **Async/Await**: Use `async/await` for I/O-bound operations to ensure responsiveness.
+6. [Testing Requirements](#testing-requirements)
 
-## Documentation and Maintenance
+7. [Transparency & Communication](#transparency--communication)
 
-- **README Updates**: Revise the README when introducing significant features, altering CLI options, or changing installation procedures.
-- **API Documentation**: For new API endpoints, document request/response schemas and provide usage examples.
-- **Dependency Review**: Regularly check dependencies for known vulnerabilities.
+---
 
-## Version Control
+## Environment Setup
 
-- **Branching and Pull Requests**: Only create new branches or open pull requests when explicitly requested by the user via the `#github-pull-request-agent` hashtag. By default, work on the current branch and commit changes locally without initiating pull requests.
+### Virtual Environment
 
-## Additional Recommendations
+- **Repository-local environment**: Agents may create and use a virtual environment located at `./.venv` in the repository root.
 
-- **Code Style**: Adhere to PEP 8 guidelines for Python code style.
-- **Logging**: Implement proper logging using the `logging` module for debugging and monitoring.
-- **Error Messages**: Provide clear and informative error messages to aid in troubleshooting.
-- **Code Reviews**: Encourage code reviews for significant changes to maintain quality.
-- **Performance**: Optimize code for performance, especially in resource-intensive operations.
-- **Modularity**: Write modular, reusable code with clear separation of concerns.
-- **Version Compatibility**: Ensure code compatibility with the target Python version (3.11+).
-- **Continuous Integration**: Integrate CI/CD pipelines for automated testing and deployment where applicable.
+- **Python interpreter**: All Python commands, scripts, and tests **must** use the interpreter at `./.venv/bin/python`. Never use the system Python or global environment.
+
+- **Activation**: When running terminal commands, explicitly invoke `./.venv/bin/python` or `./.venv/bin/<tool>` rather than relying on shell activation.
+
+### Package Management
+
+- **Manifest-based installation**: Agents are permitted to install packages declared in repository manifests (e.g., `pyproject.toml`, `requirements.txt`) into the local `.venv` without requiring additional explicit approval for each installation.
+
+- **Global environment prohibition**: Under no circumstances should packages be installed into the system or global Python environment. All dependencies must remain isolated within `./.venv`.
+
+- **Dependency updates**: When adding new dependencies, update the appropriate manifest file (`pyproject.toml` preferred) and document the reason in commit messages or PR descriptions.
+
+---
+
+## Code Quality & Style
+
+### Linting & Formatting Tools
+
+This project uses the following tools to maintain consistent code quality:
+
+- **pre-commit**: Manages code quality hooks, including ruff for linting and formatting
+
+- **ruff**: Automatic code formatter and linter, configured in `pyproject.toml` and run via pre-commit
+
+- **mypy**: Static type checker that enforces our annotation standards during CI and local development (run separately, not via pre-commit)
+
+### Formatting Workflow
+
+Before committing code changes:
+
+```bash
+pre-commit run --all-files
+./.venv/bin/mypy src/
+```
+
+Alternatively, to format specific files:
+
+```bash
+pre-commit run --files <file_or_directory>
+./.venv/bin/mypy src/
+```
+
+Note: If pre-commit is not installed, agents may run `pre-commit install` to set it up.
+
+---
+
+## Python Best Practices
+
+### Type Annotations
+
+- **Mandatory typing**: Add type annotations to all function signatures, method signatures, and class attributes.
+
+- **Return types**: Always specify return types, including `None` when applicable.
+
+- **Minimize `Any`**: Do not just use `Any` for typing to make the error go away. Use appropriate type annotations and only use `Any` when applicable (ex. if there are > 3 different return types possible).
+
+- **Forward references**: Use `from __future__ import annotations` to defer evaluation of type annotations, allowing forward references without string literals.
+
+- **Python 3.11+ type hints**: Use built-in generic types instead of typing module equivalents (e.g., `dict[str, Any]` instead of `Dict[str, Any]`, `list[str]` instead of `List[str]`).
+
+**Example:**
+
+```python
+from __future__ import annotations  # Modern approach: defers evaluation, no string literals needed
+from typing import Any
+
+def process_request(
+    request_id: str, 
+    data: dict[str, Any], 
+    timeout: float | None = None
+) -> list[Response]:
+    """Process a request and return results."""
+    ...
+
+class Response:
+    def __init__(self, status: str) -> None:
+        self.status = status
+
+# Example of self-referential type (forward reference)
+class Node:
+    def __init__(self, value: str, children: list[Node] | None = None) -> None:
+        self.value = value
+        self.children = children or []
+
+# Alternative with string literals (for older Python or when not using __future__ import):
+# class Node:
+#     def __init__(self, value: str, children: list["Node"] | None = None) -> None:
+#         self.value = value
+#         self.children = children or []
+```
+
+### Documentation
+
+- **Docstrings required**: All modules, classes, and methods, including private methods, must have descriptive docstrings.
+
+- **Docstring format**: Use triple double-quotes. Method docstrings, including private method docstrings, must follow NumPy style, with sections for Parameters, Returns where applicable, and Raises where applicable. The first line should be a concise summary; additional lines may include extended descriptions.
+
+- **Update existing docstrings**: If modifying a function's behavior, update its docstring to reflect changes.
+
+**Example:**
+
+```python
+def calculate_metrics(data: list[float], threshold: float) -> dict[str, float]:
+    """Calculate statistical metrics for the provided data.
+    
+    Parameters
+    ----------
+    data : list[float]
+        List of numerical values to analyze.
+    threshold : float
+        Minimum value threshold for filtering.
+        
+    Returns
+    -------
+    dict[str, float]
+        Dictionary containing mean, median, and standard deviation.
+        
+    Raises
+    ------
+    ValueError
+        If data list is empty or threshold is negative.
+    """
+    ...
+```
+
+### Code Organization
+
+- **Import placement**: All import statements must appear at the top of the file, grouped as follows:
+
+  1. Standard library imports
+
+  2. Third-party library imports
+
+  3. Local application imports
+  
+  Use blank lines to separate groups.
+
+- **Preserve comments**: Retain all existing inline comments and block comments when editing code. They provide valuable context for future maintainers.
+
+- **Modularity**: Break complex functions into smaller, testable units. Aim for single-responsibility principles.
+
+- **File size awareness**: Keep individual `.py` files to roughly 1,000 lines or fewer. If a module grows beyond that, propose and plan a split into multiple focused files.
+
+### String Handling
+
+- **Avoid `textwrap.dedent()`**: Do not rely on Python's `dedent` helper. Write string literals with the intended indentation or build them via explicit joins so the resulting layout is always obvious to readers.
+
+---
+
+## Error Handling & Logging
+
+### Exception Handling
+
+- **Specific exceptions**: Never catch bare `Exception` unless absolutely necessary. Always catch the most specific exception type(s) relevant to the operation.
+
+- **Multiple exception types**: Use tuple syntax when catching multiple exceptions: `except (TypeError, ValueError) as e:`
+
+- **Re-raise when appropriate**: If you catch an exception but cannot handle it meaningfully, re-raise it or raise a more descriptive custom exception.
+
+**Example:**
+
+```python
+# ❌ Avoid this
+try:
+    result = risky_operation()
+except Exception as e:
+    logger.error(f"Something went wrong: {e}")
+
+# ✅ Prefer this
+try:
+    result = risky_operation()
+except (FileNotFoundError, PermissionError) as e:
+    logger.error(f"File access error: {e}")
+    raise
+except json.JSONDecodeError as e:
+    logger.warning(f"Invalid JSON response: {e}")
+    return None
+```
+
+### Logging Practices
+
+- **Use loguru**: 
+
+  - The project uses `loguru` for logging. Import it as `from loguru import logger`.
+
+  - Use f-string format for logging strings.
+
+- **Appropriate log levels**:
+
+  - `logger.debug()`: Detailed diagnostic information
+
+  - `logger.info()`: General informational messages (startup, shutdown, major operations)
+
+  - `logger.warning()`: Potentially problematic situations that don't prevent operation
+
+  - `logger.error()`: Errors that prevent a specific operation from completing
+
+  - `logger.critical()`: Severe errors that may cause the application to terminate
+  
+- **Contextual information**: Include relevant context in log messages (request IDs, file paths, configuration values, etc.).
+
+**Example:**
+
+```python
+logger.info(f"Loading model from {model_path}")
+try:
+    model = load_model(model_path)
+    logger.info(f"Model loaded successfully: {model.name}")
+except ModelLoadError as e:
+    logger.error(f"Failed to load model from {model_path}: {e}")
+    raise
+```
+
+---
+
+## Version Control & Collaboration
+
+### Branch & PR Creation
+
+- **Explicit user request required**: Only create new branches or open pull requests when the user explicitly asks for it **or** when the user includes the hashtag `#github-pull-request-agent` in their request.
+
+- **Asynchronous agent handoff**: The `#github-pull-request-agent` hashtag signals that the task should be handed off to the asynchronous GitHub Copilot coding agent after all planning, analysis, and preparation are complete.
+
+- **No staging or committing without permission**: Agents must **not** stage (`git add`) or commit changes unless the user explicitly requests it. Only make code changes to files - leave git operations to the user.
+
+### Commit Messages
+
+- Use clear, descriptive commit messages that explain the "what" and "why" of changes.
+
+- Follow conventional commit format when possible: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
+
+**Examples:**
+
+```text
+feat: add JIT model loading and idle auto-unload support
+fix: resolve race condition in handler manager locking
+docs: update README with new CLI options for JIT mode
+test: add config validation tests for auto-unload settings
+```
+
+---
+
+## Testing Requirements
+
+### Test Coverage
+
+- **New features**: All new functionality must include corresponding unit tests in the `tests/` directory.
+
+- **Bug fixes**: When fixing a bug, add a regression test to prevent recurrence.
+
+- **Run tests locally**: Before committing, run the test suite in the .venv using:
+  
+  ```bash
+  ./.venv/bin/python -m pytest tests/
+  ```
+
+- **.venv pytest only**: Always invoke `pytest` via the virtual environment executables (e.g., `./.venv/bin/pytest` or `./.venv/bin/python -m pytest`) to guarantee consistent dependency resolution.
+
+- **Test organization**: Mirror the structure of `src/mlx_openai_server_hub` in `tests/`, e.g., tests for `src/mlx_openai_server_hubconfig.py` go in `tests/test_config.py`.
+
+### Testing Best Practices
+
+- Use `pytest` fixtures for setup/teardown and shared test data.
+
+- Use descriptive test function names: `test_auto_unload_requires_jit_when_configured()`
+
+- Mock external dependencies (network calls, file I/O) to keep tests fast and reliable.
+
+- Verify both success paths and error conditions.
+
+- **Parameterized tests**: Use parameterized tests to test multiple inputs efficiently, reducing code duplication.
+
+---
+
+## Transparency & Communication
+
+### Deviation Disclosure
+
+When an agent cannot or chooses not to follow one or more guidelines in this document, it **must** explicitly disclose:
+
+1. **Which guideline(s)** are not being followed
+
+2. **Concise reason** for the deviation
+
+**Common reasons for deviations:**
+
+- System or developer instruction conflicts
+
+- Missing permissions or credentials
+
+- Missing development dependencies (e.g., linters not installed)
+
+- User-denied install or network access
+
+- Safety policy restrictions
+
+**Example disclosure:**
+
+> **⚠️ Deviation Notice:**  
+> The code was not formatted with ruff because the dev dependencies are not installed in the current environment. Run `./.venv/bin/pip install -e '.[dev]'` to enable linting/formatting tools.
+
+### Communication Principles
+
+- **Be explicit**: Clearly state what changes were made, which files were modified, and any side effects.
+
+- **Provide context**: When suggesting alternative approaches, explain trade-offs and reasoning.
+
+- **Highlight risks**: If a change introduces potential risks or requires manual verification, call it out.
+
+- **Next steps**: After completing work, suggest logical next steps (e.g., running tests, reviewing logs, checking for regressions).
+
+---
+
+## Additional Guidelines
+
+### Documentation Updates
+
+- **README.md**: Update the README when adding significant features, changing CLI options, or modifying installation steps.
+
+- **Inline documentation**: Maintain clear, up-to-date comments for complex algorithms, configuration settings, and architectural decisions.
+
+- **API documentation**: If exposing new API endpoints, document request/response schemas and usage examples.
+
+### Performance Considerations
+
+- **Profiling**: When optimizing performance-critical code, measure before and after to quantify improvements.
+
+- **Memory management**: Be mindful of memory usage, especially when loading large models.
+
+- **Async patterns**: Leverage async/await for I/O-bound operations to maintain responsiveness.
+
+### Security
+
+- **Input validation**: Validate all user inputs, especially file paths and model parameters.
+
+- **Secrets management**: Never hardcode API keys, tokens, or credentials. Use environment variables or secure configuration files.
+
+- **Dependency auditing**: Periodically review dependencies for known vulnerabilities.
+
+---
+
+## Summary Checklist
+
+Before finalizing any code contribution, verify:
+
+- ✅ Virtual environment (`./.venv`) is used for all operations
+- ✅ Code passes `pre-commit` and `mypy`
+- ✅ Type annotations are present on all functions/methods
+- ✅ Docstrings follow NumPy style conventions
+- ✅ Specific exceptions are caught (not bare `Exception`)
+- ✅ Appropriate logging is in place
+- ✅ Existing comments are preserved
+- ✅ Imports are organized at the top of files
+- ✅ `pytest` runs via `.venv` executables only
+- ✅ Large modules are evaluated for splitting once they approach 1,000 lines
+- ✅ Tests are written and passing
+- ✅ Documentation is updated (README, docstrings, etc.)
+- ✅ No branches/PRs created unless explicitly requested
+- ✅ Any deviations from guidelines are disclosed
