@@ -32,7 +32,7 @@ jobs:
 
       - name: Update Version in const.py
         run: |
-          sed -i '' -e "s/^__version__ \= \".*\"/__version__ \= \"${{ env.VERSION }}\"/" ./src/mlx_server_orch/const.py
+          sed -i '' -e "s/^__version__ \= \".*\"/__version__ \= \"${{ env.VERSION }}\"/" ./src/mlx_openai_server_hub/const.py
 
       - name: Commit & Push Version Changes
         if: ${{ github.event_name == 'release' && github.event.release.draft == false && github.event.release.prerelease == false  }}

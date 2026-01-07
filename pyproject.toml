@@ -14,13 +14,36 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-  #"mlx-openai-server>1.3.12",
+  #"mlx-openai-server>1.4.2",
+  "click>=8.1.7,<9",
+  "fastapi>=0.115,<0.116",
+  "httpx>=0.26,<0.28",
+  "Jinja2>=3.1,<3.2",
   "loguru==0.7.3",
   "PyYAML==6.0.2",
+  "uvicorn>=0.30,<0.31",
 ]
 
 [dependency-groups]
-dev = ["pytest", "ruff"]
+dev = [
+  "codespell",
+  "fastapi",
+  "mypy",
+  "pre-commit",
+  "pytest",
+  "ruff",
+  "pytest-asyncio",
+  "pytest-httpx",
+  "types-aiofiles",
+  "types-cffi",
+  "types-PyMySQL",
+  "types-pyRFC3339",
+  "types-python-dateutil",
+  "types-PyYAML",
+  "types-regex",
+  "types-requests",
+  "types-setuptools",
+]
 
 [project.urls]
 Repository = "https://github.com/Snuffy2/mlx-openai-server-hub"
@@ -139,6 +162,7 @@ ignore = [
   "D202", # No blank lines allowed after function docstring
   "D203", # 1 blank line required before class docstring
   "D213", # Multi-line docstring summary should start at the second line
+  "D401", # Imperative mood in docstring
   "D406", # Section name should end with a newline
   "D407", # Section name underlining
   "E501", # line too long
@@ -191,6 +215,22 @@ ignore = [
 ]
 fixable = ["ALL"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+  "SLF001", # Private member accessed
+  #"D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107",  # Docstring rules
+  "PLR2004", # Magic value used in comparison
+  "S101",    # Use of assert detected
+  "PLR0913", # Too many arguments to function call
+  "C901",    # Function is too complex
+  "E501",    # line too long
+  "B017",    # Don't assert blind Exception
+  "PT006",   # Wrong type passed to first argument
+  "S108",
+  "D401",
+  "D417",
+]
+
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = false
 mark-parentheses = false
@@ -201,7 +241,7 @@ combine-as-imports = true
 split-on-trailing-comma = false
 
 [project.scripts]
-"mlx-openai-server-hub" = "mlx_server_orch.main:main"
+"mlx-openai-server-hub" = "mlx_openai_server_hub.main:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -209,8 +249,11 @@ package-dir = { "" = "src" }
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"mlx_openai_server_hub.hub" = ["templates/*.html", "templates/*.html.jinja"]
+
 [tool.setuptools.dynamic]
-version = { attr = "mlx_server_orch.const.__version__" }
+version = { attr = "mlx_openai_server_hub.const.__version__" }
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

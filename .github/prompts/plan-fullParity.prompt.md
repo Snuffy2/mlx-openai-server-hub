@@ -28,14 +28,20 @@ mlx-openai-server-hub should look for the configuration file in `~/mlx-openai-se
 
 ## Steps
 
-1. Catalog Create-hub specs: pull mlx-openai-server Create-hub branch to copy the hub Click group/subcommands, hub.yaml schema/defaults, and status UI routes/assets (port/auth).
+1. Catalog Create-hub specs: pull mlx-openai-server Create-hub branch to copy the hub Click group/subcommands, hub.yaml schema/defaults, and status UI routes/assets (port/auth). **(done – CLI commands, hub.yaml defaults, daemon endpoints, and status UI buttons collected)**
 
-2. Map current code: review main.py, const.py, paths.py, model_registry.py to list gaps vs Create-hub commands, config, and UI.
+2. Map current code: review main.py, const.py, paths.py, model_registry.py to list gaps vs Create-hub commands, config, and UI. **(done – current hub uses argparse-only CLI, models.yaml registry, no web UI, no hub daemon)**
 
-3. Align CLI/config: implement mlx-openai-server-hub <command> parity (start/reload/status/shutdown/load/unload/start-model/stop-model), read ~/mlx-openai-server-hub/hub.yaml, and mirror Create-hub defaults/flags including status UI enable/port/auth.
+3. Align CLI/config: implement mlx-openai-server-hub <command> parity (start/reload/status/shutdown/load/unload/start-model/stop-model), read ~/mlx-openai-server-hub/hub.yaml, and mirror Create-hub defaults/flags including status UI enable/port/auth. **(done – Click CLI parity wired; hub.yaml loader with defaults/port allocation; daemon start uses FastAPI/uvicorn; status flag plumbed)**
 
-4. Recreate orchestration: port allocation, model registry, start/stop/load/unload handlers, reload/shutdown flow, health/status endpoints, adapted to JIT-and-Auto-Unload server APIs and lifecycle (JIT load, auto-unload).
+4. Recreate orchestration: port allocation, model registry, start/stop/load/unload handlers, reload/shutdown flow, health/status endpoints, adapted to JIT-and-Auto-Unload server APIs and lifecycle (JIT load, auto-unload). **(done – runtime now tracks subprocess return codes, refreshes liveness in the monitor loop, exposes richer status payload with uptime/log paths, and keeps group caps/idle unload enforcement active)**
 
-5. Rebuild status UI: add routes/templates/static JS mirroring Create-hub buttons/options and endpoints; bind to the same default port/auth behavior as Create-hub.
+5. Rebuild status UI: add routes/templates/static JS mirroring Create-hub buttons/options and endpoints; bind to the same default port/auth behavior as Create-hub. **(done – status dashboard refreshed with gradient styling, auto-refresh toggle, group chips, actionable buttons, and live counts backed by the new status payload)**
 
-6. Update docs: README usage for mlx-openai-server-hub, config reference for hub.yaml fields, and notes on JIT-and-Auto-Unload compatibility.
+6. Update docs: README usage for mlx-openai-server-hub, config reference for hub.yaml fields, and notes on JIT-and-Auto-Unload compatibility. **(done – README now documents hub.yaml defaults, CLI parity, status UI access, and JIT/auto-unload expectations)**
+
+7. Build out integration tests: CLI command tests, config loading tests, orchestration behavior tests (start/stop/load/unload/reload/shutdown), and status UI endpoint tests. **(done – pytest covers hub config validation, runtime lifecycle with stubs, and FastAPI control/status routes)**
+
+## Plan Status
+
+All steps are complete; parity work is finished and verified via pytest.
