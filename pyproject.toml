@@ -15,13 +15,14 @@ dynamic = ["version"]
 
 dependencies = [
   #"mlx-openai-server>1.4.2",
+  "mlx-openai-server @ git+https://github.com/Snuffy2/mlx-openai-server.git@JIT-and-Auto-Unload",
   "click>=8.1.7,<9",
   "fastapi>=0.115,<0.116",
-  "httpx>=0.26,<0.28",
+  "httpx>=0.28,<1",
   "Jinja2>=3.1,<3.2",
   "loguru==0.7.3",
   "PyYAML==6.0.2",
-  "uvicorn>=0.30,<0.31",
+  "uvicorn>=0.35,<0.45",
 ]
 
 [dependency-groups]
