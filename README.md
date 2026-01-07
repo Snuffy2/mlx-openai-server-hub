@@ -1,147 +1,89 @@
 # MLX OpenAI Server Hub
 
-Wraps [MLX OpenAI Server](https://github.com/cubist38/mlx-openai-server) workers in a small CLI so you can launch and manage multiple OpenAI-compatible back-ends on the same machine. All model metadata lives in a single YAML file.
+`mlx-openai-server-hub` mirrors the Create-hub workflow from `mlx-openai-server` while wrapping the JIT-and-Auto-Unload branch. It reads `~/mlx-openai-server-hub/hub.yaml`, starts a FastAPI controller, launches model workers, and serves the status dashboard at `/hub/`.
 
-If a port is defined, it will use that port (if not already in use). Otherwise it will assign a port sequentially starting from `starting_port`.
-
-## models.yaml
-
-**base_path:** _(optional, defaults to `~/mlx-openai-server-hub`)_ — root directory where `logs/` and `pids/` are written. Relative paths are resolved against the config file's location.
-
-**starting_port:** _(optional, defaults to 5005)_
-
-**models:**
-
-| Field | Required | Default | Description |
-| --- | :---: | --- | --- |
-| name | ✓ |  | Name used by the Hub (e.g., qwen3_30b) |
-| model_path | ✓ |  | Huggingface model name (e.g., owner/model-name) |
-| default |  | false | If true, the model is started when `start` is run without names |
-| model_type |  | "lm" | |
-| context_length |  | 32768 | Maximum token context length for the model |
-| port |  | `auto-assigned` | TCP port the server will listen on; auto-assigned if omitted |
-| host |  | "0.0.0.0" | Host/IP to bind the server to |
-| max_concurrency |  | 1 | Max simultaneous requests the worker will accept |
-| queue_timeout |  | 300 | How long (seconds) to wait for queued requests |
-| queue_size |  | 100 | Maximum number of queued requests |
-| disable_auto_resize |  | false | |
-| quantize |  | 8 | |
-| config_name |  |  | |
-| lora_paths |  |  | |
-| lora_scales |  |  | |
-| log_file |  | <base_path>/logs/<name>.log | Path and name of per-model log file |
-| no_log_file |  | false | When true, suppress writing a per-model log file |
-| log_level |  | "INFO" | Logging level for the worker process |
-| enable_auto_tool_choice |  | false | Allow the model to select tools automatically when available |
-| tool_call_parser |  |  | |
-| reasoning_parser |  |  | |
-| trust_remote_code |  | false | Allow execution of remote model code when loading (use with caution) |
-
-If you omit `log_file` (and `no_log_file` is `false`) the loader writes logs to `<base_path>/logs/<name>.log` automatically.
-
-### Example snippet from `models.yaml`:
-
-```yaml
-base_path: ~/mlx-openai-server-hub
-starting_port: 5005
-models:
-  - name: qwen3_30b
-    model_path: mlx-community/Qwen3-30B-A3B-4bit-DWQ
-    default: true
-    enable_auto_tool_choice: true
-    trust_remote_code: true
-    tool_call_parser: qwen3_moe
-    reasoning_parser: qwen3_moe
-
-  - name: medgemma_4b
-    model_path: mlx-community/medgemma-4b-it-4bit
-    enable_auto_tool_choice: true
-    trust_remote_code: true
-```
-
-## Configuration File Location
-
-The `models.yaml` file is searched for in the following order:
-
-1. Path specified via `--config` CLI argument
-2. Path specified in `MLXSERVER_MODELS_PATH` environment variable
-3. `models.yaml` in the current working directory
-4. `models.yaml` in the default base path (`~/mlx-openai-server-hub`)
-
-## CLI commands
-
-All commands run through `mlx-openai-server-hub <command>`. The `start` command launches child processes and runs detached. All commands support the global `--config` option to specify the path to `models.yaml`, or set the `MLXSERVER_MODELS_PATH` environment variable.
-
-| Command | Description |
-| --- | --- |
-| `start [name ...]` | Start one or more models. Without names, every entry marked `default: true` is launched. |
-| `stop [name ...]` | Stops the named models. Without names, every model is stopped. |
-| `models` | Lists all configured models, marking which entries are defaults. |
-| `status` | Shows which models are running along with PID and port information. |
-| `help` | Prints CLI usage plus the `start` command-specific help. |
-
-### Typical workflow
-
-```bash
-mlx-openai-server-hub models
-mlx-openai-server-hub start                   # starts every default model
-mlx-openai-server-hub start medgemma_4b       # start one additional model
-mlx-openai-server-hub status                  # inspect running servers
-mlx-openai-server-hub stop medgemma_4b        # stop one model
-```
-
-You can specify a custom config file:
-
-```bash
-mlx-openai-server-hub --config /path/to/models.yaml start
-# or
-MLXSERVER_MODELS_PATH=/path/to/models.yaml mlx-openai-server-hub start
-```
-
-* Each started model writes logs to `<base_path>/logs/` (and per-process PID files in `<base_path>/pids/`).
-* Edit `models.yaml` whenever you need to add, remove, or retune a model
-
-
-## Local Install for Testing and Development
-
-### Install & run
-
-Install the CLI into a virtual environment (recommended) and run the
-`mlx-openai-server-hub` command:
+## Quick start
 
 ```bash
 git clone https://github.com/Snuffy2/mlx-openai-server-hub.git
 cd mlx-openai-server-hub
 python -m venv .venv
 ./.venv/bin/python -m pip install -e .
-source .venv/bin/activate
-# then run the installed CLI
-mlx-openai-server-hub models
+
+# create your hub.yaml in ~/mlx-openai-server-hub/hub.yaml
+cp models.yaml-example ~/mlx-openai-server-hub/hub.yaml
+
+# launch the hub daemon and non-JIT models
+./.venv/bin/python -m mlx_openai_server_hub.main start
+
+# inspect status (CLI)
+./.venv/bin/python -m mlx_openai_server_hub.main status
+# or open http://127.0.0.1:8000/hub/ if status pages are enabled
 ```
 
-Or install system-wide (or in your active environment):
+## hub.yaml reference
 
-```bash
-pip install .
-mlx-openai-server-hub start
-```
+Hub-level settings live at `~/mlx-openai-server-hub/hub.yaml` (override with `--config`). Defaults mirror the Create-hub branch:
 
-If you prefer not to install, you can run the CLI directly from the repo using
-the virtualenv interpreter:
+| Field | Default | Description |
+| --- | --- | --- |
+| `host` | `0.0.0.0` | Bind host for the controller and status page |
+| `port` | `8000` | Controller port |
+| `model_starting_port` | `47850` | Starting port used when models omit an explicit port |
+| `log_level` | `INFO` | Log level passed to model workers |
+| `log_path` | `~/mlx-openai-server-hub/logs` | Root directory for hub and model logs |
+| `enable_status_page` | `true` | Serve the status dashboard at `/hub/` |
+| `models` | _(required)_ | List of model entries (see below) |
+| `groups` | `[]` | Optional group constraints for JIT/auto-unload |
 
-```bash
-./.venv/bin/python -m mlx_server_orch.main models
-```
+### Model entries
 
-### Build & package
+Each model entry is validated against `MLXServerConfig` from `mlx-openai-server`. Key options:
 
-A minimal example to build a wheel locally and install it for testing.
+| Field | Required | Default | Notes |
+| --- | :---: | --- | --- |
+| `name` | ✓ | — | Slug used for CLI and status output |
+| `model_path` | ✓ | — | HF model id or local path |
+| `port` |  | auto-allocated | Reserved from `model_starting_port` if omitted (persisted across reloads) |
+| `host` |  | hub `host` | Worker bind host |
+| `jit_enabled` |  | `false` | When true the worker stays off until explicitly loaded and can auto-unload when idle |
+| `group` |  | — | Optional group slug used for max-loaded/idle-unload rules |
+| `log_file` |  | `<log_path>/<name>.log` | Auto-filled unless `no_log_file` is true |
+| `model_type`, `context_length`, `max_concurrency`, `queue_timeout`, `queue_size`, `quantize`, `config_name`, `lora_paths`, `lora_scales`, `enable_auto_tool_choice`, `tool_call_parser`, `reasoning_parser`, `message_converter`, `trust_remote_code`, `chat_template_file`, `disable_auto_resize`, `debug`, `no_log_file` |  | varies | Passed through to `mlx-openai-server launch` |
 
-```bash
-# build a wheel (requires the `build` package)
-python -m pip install --upgrade build
-python -m build --wheel
+### Groups
 
-# install the produced wheel locally
-pip install dist/*.whl
-```
+Groups bound to JIT-enabled models let you cap concurrency and unload idle workers:
+
+| Field | Description |
+| --- | --- |
+| `name` | Slug matching member model `group` values |
+| `max_loaded` | Maximum simultaneously running members; oldest running model is unloaded to make room |
+| `idle_unload_trigger_min` | Minutes of inactivity before auto-unloading; requires all members to set `jit_enabled: true` |
+
+## CLI commands
+
+All commands accept `--config` to point at an alternate `hub.yaml`.
+
+| Command | Purpose |
+| --- | --- |
+| `start` | Start the FastAPI hub daemon and all non-JIT models |
+| `reload` | Re-read `hub.yaml` and reconcile running workers |
+| `shutdown` | Stop all workers and request daemon shutdown |
+| `status` | Show hub binding, model state, and group summaries |
+| `start-model <name>` | Start a specific worker |
+| `stop-model <name>` | Stop a specific worker |
+| `load-model <name>` | Load a JIT-enabled worker |
+| `unload-model <name>` | Unload a JIT-enabled worker |
+| `stop` | Stop all managed workers but keep the daemon alive |
+| `watch` | Repeatedly poll `/hub/status` (CLI client) |
+
+## Status page
+
+When `enable_status_page` is true the dashboard is available at `http://<host>:<port>/hub/`. It exposes start/stop/load/unload controls, group chips, and live counters backed by `/hub/status`.
+
+## Development
+
+- Keep the virtual environment in `.venv` and run tools with `./.venv/bin/python ...`.
+- Format/lint with `pre-commit run --all-files` (ruff) and type-check with `./.venv/bin/python -m mypy src/` when available.
+- Run tests: `./.venv/bin/python -m pytest tests/`.

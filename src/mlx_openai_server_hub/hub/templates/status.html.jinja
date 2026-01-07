@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>mlx-openai-server-hub status</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #0b1222cc;
+            --panel-strong: #11182b;
+            --ink: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-2: #8b5cf6;
+            --success: #22c55e;
+            --warn: #f97316;
+            --danger: #ef4444;
+            --border: #1f2937;
+            --card-shadow: 0 8px 26px rgba(0, 0, 0, 0.22);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: radial-gradient(circle at 20% 20%, #122040 0, #0b1326 30%, #080c1a 75%);
+            color: var(--ink);
+            font-family: "Space Grotesk", "DM Sans", "Helvetica Neue", sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .shell { max-width: 1180px; margin: 0 auto; padding: 32px 24px 48px; }
+        .hero { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+        h1 { margin: 4px 0 8px; font-size: 32px; letter-spacing: -0.02em; }
+        p { margin: 0; }
+        .eyebrow { text-transform: uppercase; letter-spacing: 0.3em; font-size: 11px; color: var(--muted); }
+        .muted { color: var(--muted); }
+        .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        button {
+            border: 1px solid var(--border);
+            background: linear-gradient(120deg, rgba(56, 189, 248, 0.2), rgba(139, 92, 246, 0.16));
+            color: var(--ink);
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.08s ease, border-color 0.1s ease, background 0.15s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
+        button:hover { transform: translateY(-1px); border-color: var(--accent); }
+        button.secondary { background: rgba(255, 255, 255, 0.04); }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            font-size: 13px;
+            color: var(--muted);
+        }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 20px 0; }
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: var(--card-shadow);
+        }
+        .card-title { font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
+        .stat { font-size: 24px; font-weight: 700; }
+        .stat-sub { color: var(--muted); font-size: 13px; }
+        .table-wrapper { overflow: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { text-align: left; padding: 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-weight: 600; letter-spacing: 0.02em; }
+        tr:hover td { background: rgba(255, 255, 255, 0.02); }
+        .badge { padding: 4px 10px; border-radius: 10px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; display: inline-flex; align-items: center; gap: 6px; }
+        .badge.running { background: rgba(34, 197, 94, 0.18); color: #bbf7d0; }
+        .badge.starting { background: rgba(56, 189, 248, 0.18); color: #bae6fd; }
+        .badge.stopped { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+        .badge.failed { background: rgba(239, 68, 68, 0.18); color: #fecdd3; }
+        .badge.configured { background: rgba(139, 92, 246, 0.18); color: #ddd6fe; }
+        .pill.success { color: #bbf7d0; }
+        .pill.danger { color: #fecdd3; }
+        .pill.warn { color: #fed7aa; }
+        .group-list { display: flex; flex-wrap: wrap; gap: 10px; }
+        .group-chip { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); min-width: 180px; }
+        .small { font-size: 12px; color: var(--muted); }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #111827; color: var(--ink); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35); opacity: 0; transform: translateY(10px); transition: opacity 0.2s ease, transform 0.2s ease; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+        @media (max-width: 740px) { .hero { flex-direction: column; } button { width: 100%; justify-content: center; text-align: center; } }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <div class="hero">
+            <div>
+                <div class="eyebrow">mlx-openai-server-hub</div>
+                <h1>Hub Status</h1>
+                <p class="muted">Live view of managed mlx-openai-server workers</p>
+            </div>
+            <div class="controls">
+                <button onclick="action('/hub/reload')">Reload</button>
+                <button onclick="action('/hub/shutdown')" class="secondary">Shutdown</button>
+                <button onclick="action('/hub/models/stop-all')" class="secondary">Stop all</button>
+                <label class="toggle"><input type="checkbox" id="autoRefresh" checked> Auto-refresh</label>
+                <button onclick="refresh()" class="secondary">Refresh now</button>
+            </div>
+        </div>
+
+        <div class="summary-grid">
+            <div class="card">
+                <div class="card-title">Controller</div>
+                <div class="stat" id="hub-binding">–</div>
+                <div class="stat-sub" id="hub-flags">Loading…</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Models</div>
+                <div class="stat" id="model-count">–</div>
+                <div class="stat-sub" id="running-count">–</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Uptime</div>
+                <div class="stat" id="hub-uptime">–</div>
+                <div class="stat-sub" id="last-updated">–</div>
+            </div>
+        </div>
+
+        <div class="card" id="group-card">
+            <div class="card-title" style="margin-bottom: 8px;">Groups</div>
+            <div class="group-list" id="group-list">
+                <div class="small">No groups configured</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="table-head" style="display:flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <div>
+                    <div class="card-title">Models</div>
+                    <p class="muted" id="table-caption">Current process state</p>
+                </div>
+                <div class="pill" id="status-page-pill">Status page</div>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Port</th>
+                            <th>Group</th>
+                            <th>JIT</th>
+                            <th>PID</th>
+                            <th>Last active</th>
+                            <th>Last error</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="model-rows"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const toastEl = document.getElementById('toast');
+        const autoRefreshToggle = document.getElementById('autoRefresh');
+        let refreshTimer = null;
+        const REFRESH_MS = 7000;
+
+        function showToast(message, tone = 'info') {
+            toastEl.textContent = message;
+            toastEl.classList.add('show');
+            if (tone === 'error') {
+                toastEl.style.borderColor = 'var(--danger)';
+            } else if (tone === 'warn') {
+                toastEl.style.borderColor = 'var(--warn)';
+            } else {
+                toastEl.style.borderColor = 'var(--accent)';
+            }
+            setTimeout(() => toastEl.classList.remove('show'), 2600);
+        }
+
+        function formatTimeAgo(ts) {
+            if (!ts) return '—';
+            const diff = Math.max(0, Date.now() / 1000 - ts);
+            if (diff < 60) return `${Math.floor(diff)}s ago`;
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            return `${Math.floor(diff / 86400)}d ago`;
+        }
+
+        function formatUptime(seconds) {
+            if (!seconds) return '—';
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        }
+
+        function statusBadge(status) {
+            const badge = document.createElement('span');
+            badge.className = `badge ${status}`;
+            badge.textContent = status;
+            return badge;
+        }
+
+        function setAutoRefresh(enabled) {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+            if (enabled) {
+                refreshTimer = setInterval(refresh, REFRESH_MS);
+            }
+        }
+
+        autoRefreshToggle.addEventListener('change', (e) => setAutoRefresh(e.target.checked));
+
+        async function refresh() {
+            try {
+                const res = await fetch('/hub/status');
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                renderStatus(data);
+            } catch (err) {
+                showToast(`Failed to load status: ${err}`, 'error');
+            }
+        }
+
+        async function action(path) {
+            try {
+                const res = await fetch(path, { method: 'POST' });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Action sent');
+                await refresh();
+            } catch (err) {
+                showToast(`Request failed: ${err}`, 'error');
+            }
+        }
+
+        function renderGroups(groups) {
+            const target = document.getElementById('group-list');
+            target.innerHTML = '';
+            if (!groups || groups.length === 0) {
+                target.innerHTML = '<div class="small">No groups configured</div>';
+                return;
+            }
+            for (const group of groups) {
+                const chip = document.createElement('div');
+                chip.className = 'group-chip';
+                const cap = group.max_loaded ? `${group.running}/${group.max_loaded} running` : `${group.running}/${group.total} running`;
+                const idle = group.idle_unload_trigger_min ? `${group.idle_unload_trigger_min}m idle unload` : 'idle unload off';
+                chip.innerHTML = `<div style="font-weight:700;">${group.name}</div><div class="small">${cap}</div><div class="small">${idle}</div>`;
+                target.appendChild(chip);
+            }
+        }
+
+        function renderModels(models) {
+            const tbody = document.getElementById('model-rows');
+            tbody.innerHTML = '';
+            let runningCount = 0;
+            for (const model of models) {
+                if (model.status === 'running') runningCount += 1;
+                const tr = document.createElement('tr');
+                const statusCell = document.createElement('td');
+                statusCell.appendChild(statusBadge(model.status));
+                const actions = `
+                    <button onclick="action('/hub/models/${model.name}/start')">Start</button>
+                    <button onclick="action('/hub/models/${model.name}/stop')" class="secondary">Stop</button>
+                    <button onclick="action('/hub/models/${model.name}/load')" class="secondary">Load</button>
+                    <button onclick="action('/hub/models/${model.name}/unload')" class="secondary">Unload</button>
+                `;
+                const lastError = model.last_error ? model.last_error : '—';
+                tr.innerHTML = `
+                    <td>${model.name}</td>
+                    <td></td>
+                    <td>${model.host}:${model.port}</td>
+                    <td>${model.group || '—'}</td>
+                    <td>${model.jit_enabled ? 'yes' : 'no'}</td>
+                    <td>${model.pid || '—'}</td>
+                    <td>${formatTimeAgo(model.last_active || model.started_at)}</td>
+                    <td>${lastError}</td>
+                    <td>${actions}</td>
+                `;
+                tr.children[1].appendChild(statusCell.firstChild);
+                tbody.appendChild(tr);
+            }
+            document.getElementById('model-count').textContent = `${models.length} configured`;
+            document.getElementById('running-count').textContent = `${runningCount} running`;
+        }
+
+        function renderStatus(data) {
+            document.getElementById('hub-binding').textContent = `${data.host}:${data.port}`;
+            document.getElementById('hub-flags').textContent = `model ports start @ ${data.model_starting_port} · log level ${data.log_level}`;
+            const statusBadgeText = data.enable_status_page ? 'Status page enabled' : 'Status page disabled';
+            const statusBadgeClass = data.enable_status_page ? 'pill success' : 'pill warn';
+            document.getElementById('status-page-pill').className = statusBadgeClass;
+            document.getElementById('status-page-pill').textContent = statusBadgeText;
+
+            const uptimeSeconds = data.started_at ? Math.max(0, (Date.now() / 1000) - data.started_at) : null;
+            document.getElementById('hub-uptime').textContent = formatUptime(uptimeSeconds);
+            document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+            renderGroups(data.groups);
+            renderModels(data.models);
+        }
+
+        setAutoRefresh(true);
+        refresh();
+    </script>
+</body>
+</html>
